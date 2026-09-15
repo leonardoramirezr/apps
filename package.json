@@ -1,0 +1,11 @@
+{
+	"name": "apps",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@11.24.0",
+	"scripts": {
+		"build": "node scripts/build.mjs",
+		"preview": "node scripts/preview.mjs",
+		"check": "pnpm --recursive check"
+	}
+}
