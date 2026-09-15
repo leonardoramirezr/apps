@@ -71,6 +71,15 @@
 			linear-gradient(170deg, #4a2a8a, #1c1446);
 	}
 
+	/* iOS home-screen web apps size the fixed viewport (and dvh) short by the top safe-area inset,
+	   leaving an empty band at the bottom; the large viewport covers the whole screen. */
+	@media (display-mode: standalone) {
+		.screen {
+			bottom: auto;
+			height: 100lvh;
+		}
+	}
+
 	.pager {
 		display: flex;
 		flex: 1;
