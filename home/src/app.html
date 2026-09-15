@@ -2,7 +2,9 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<!-- No viewport-fit=cover: iOS 26 draws home-screen web apps a status bar's height short of the
+		     screen. With cover the empty band is left at the bottom; without it, it sits under the status bar. -->
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
 		<meta name="theme-color" content="#2a1a5e" />
 		<meta name="mobile-web-app-capable" content="yes" />
