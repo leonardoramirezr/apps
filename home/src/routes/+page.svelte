@@ -29,10 +29,17 @@
 		{#each pages as page, index (index)}
 			<nav class="page" aria-label="Apps">
 				{#each page as app (app.slug)}
-					<a class="app" href={app.href} data-sveltekit-reload>
-						<img class="icon" src={app.icon} alt="" draggable="false" />
-						<span class="label">{app.name}</span>
-					</a>
+					{#if 'href' in app}
+						<a class="app" href={app.href} data-sveltekit-reload>
+							<img class="icon" src={app.icon} alt="" draggable="false" />
+							<span class="label">{app.name}</span>
+						</a>
+					{:else}
+						<button class="app" type="button" onclick={app.action}>
+							<img class="icon" src={app.icon} alt="" draggable="false" />
+							<span class="label">{app.name}</span>
+						</button>
+					{/if}
 				{/each}
 			</nav>
 		{/each}
@@ -97,9 +104,14 @@
 		align-items: center;
 		gap: calc(6 * var(--u));
 		min-width: 0;
+		padding: 0;
+		border: 0;
+		background: none;
+		font: inherit;
 		color: #fff;
 		text-decoration: none;
 		outline: none;
+		cursor: pointer;
 	}
 
 	.icon {
