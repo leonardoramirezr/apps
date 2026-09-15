@@ -1,12 +1,18 @@
 <script lang="ts">
+	import { MediaQuery } from 'svelte/reactivity';
 	import { apps } from '$lib/apps';
 	import StatusBar from '$lib/StatusBar.svelte';
 
-	// 4 columns × 6 rows, like an iPhone home screen page.
-	const PAGE_SIZE = 24;
+	// Keep in sync with the iPad media query below and in StatusBar.svelte.
+	const large = new MediaQuery('(min-width: 640px) and (min-height: 640px)');
 
-	const pages = Array.from({ length: Math.max(1, Math.ceil(apps.length / PAGE_SIZE)) }, (_, i) =>
-		apps.slice(i * PAGE_SIZE, (i + 1) * PAGE_SIZE)
+	// iPhone: 4 columns × 6 rows. iPad: 6 × 5 in landscape, 5 × 6 in portrait.
+	const pageSize = $derived(large.current ? 30 : 24);
+
+	const pages = $derived(
+		Array.from({ length: Math.max(1, Math.ceil(apps.length / pageSize)) }, (_, i) =>
+			apps.slice(i * pageSize, (i + 1) * pageSize)
+		)
 	);
 
 	let currentPage = $state(0);
@@ -16,54 +22,37 @@
 	}
 </script>
 
-<div class="stage">
-	<div class="device">
-		<div class="screen">
-			<StatusBar />
+<div class="screen">
+	<StatusBar />
 
-			<div class="pager" {onscroll}>
-				{#each pages as page, index (index)}
-					<nav class="page" aria-label="Apps">
-						{#each page as app (app.slug)}
-							<a class="app" href={app.href} data-sveltekit-reload>
-								<img class="icon" src={app.icon} alt="" draggable="false" />
-								<span class="label">{app.name}</span>
-							</a>
-						{/each}
-					</nav>
+	<div class="pager" {onscroll}>
+		{#each pages as page, index (index)}
+			<nav class="page" aria-label="Apps">
+				{#each page as app (app.slug)}
+					<a class="app" href={app.href} data-sveltekit-reload>
+						<img class="icon" src={app.icon} alt="" draggable="false" />
+						<span class="label">{app.name}</span>
+					</a>
 				{/each}
-			</div>
+			</nav>
+		{/each}
+	</div>
 
-			<div class="dots" aria-hidden="true">
-				{#each pages as _, index (index)}
-					<span class="dot" class:active={index === currentPage}></span>
-				{/each}
-			</div>
-
-			<div class="dock"></div>
-			<div class="home-indicator"></div>
-		</div>
+	<div class="dots" aria-hidden="true">
+		{#each pages as _, index (index)}
+			<span class="dot" class:active={index === Math.min(currentPage, pages.length - 1)}></span>
+		{/each}
 	</div>
 </div>
 
 <style>
-	/* All sizes are expressed in iPhone points (`--u`), scaled to fit the viewport. */
-	.stage {
+	/* All sizes are expressed in device points (`--u`), scaled to fit the viewport. */
+	.screen {
 		--u: min(1px, calc(100vw / 390));
 		position: fixed;
 		inset: 0;
-	}
-
-	.device {
-		height: 100%;
-	}
-
-	.screen {
-		position: relative;
 		display: flex;
 		flex-direction: column;
-		box-sizing: border-box;
-		height: 100%;
 		overflow: hidden;
 		padding-top: calc(env(safe-area-inset-top) + 24 * var(--u));
 		padding-bottom: calc(env(safe-area-inset-bottom) + 8 * var(--u));
@@ -166,66 +155,51 @@
 		background: #fff;
 	}
 
-	.dock {
-		flex: none;
-		height: calc(92 * var(--u));
-		margin: 0 calc(12 * var(--u));
-		border-radius: calc(34 * var(--u));
-		background: rgb(255 255 255 / 0.18);
-		box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.3);
-		-webkit-backdrop-filter: blur(40px) saturate(120%);
-		backdrop-filter: blur(40px) saturate(120%);
-	}
-
-	.home-indicator {
-		display: none;
-	}
-
-	/* On larger screens, draw the home screen inside an iPhone. */
+	/* On larger screens, fill the viewport with an iPad home screen (1180 × 820 points in landscape). */
 	@media (min-width: 640px) and (min-height: 640px) {
-		.stage {
-			--u: min(1px, calc((100dvh - 64px) / 868));
-			display: grid;
-			place-items: center;
-			background: radial-gradient(circle at 50% 40%, #f5f5f7, #d9d9df);
-		}
-
-		.device {
-			height: auto;
-			padding: calc(12 * var(--u));
-			border-radius: calc(68 * var(--u));
-			background: #111114;
-			box-shadow:
-				inset 0 0 0 calc(2 * var(--u)) #3b3b42,
-				0 calc(30 * var(--u)) calc(80 * var(--u)) rgb(0 0 0 / 0.35);
-		}
-
 		.screen {
-			width: calc(390 * var(--u));
-			height: calc(844 * var(--u));
+			--u: clamp(0.75px, min(100vw / 1180, 100dvh / 820), 1.5px);
 			padding-top: 0;
-			padding-bottom: calc(8 * var(--u));
-			border-radius: calc(56 * var(--u));
+			padding-bottom: calc(12 * var(--u));
 		}
 
 		.page {
-			padding-top: calc(20 * var(--u));
+			grid-template-columns: repeat(6, 1fr);
+			grid-template-rows: repeat(5, 1fr);
+			align-content: stretch;
+			row-gap: 0;
+			padding: calc(28 * var(--u)) calc(80 * var(--u)) 0;
 		}
 
-		.home-indicator {
-			display: block;
-			flex: none;
-			width: calc(134 * var(--u));
-			height: calc(5 * var(--u));
-			margin: calc(10 * var(--u)) auto 0;
-			border-radius: calc(3 * var(--u));
-			background: #fff;
+		.app {
+			align-self: start;
+			gap: calc(8 * var(--u));
+		}
+
+		.icon {
+			width: calc(76 * var(--u));
+			height: calc(76 * var(--u));
+		}
+
+		.label {
+			max-width: calc(110 * var(--u));
+			font-size: calc(13 * var(--u));
+		}
+
+		.dots {
+			padding: calc(18 * var(--u)) 0;
 		}
 	}
 
-	@media (min-width: 640px) and (min-height: 640px) and (prefers-color-scheme: dark) {
-		.stage {
-			background: radial-gradient(circle at 50% 40%, #26262c, #0d0d10);
+	@media (min-width: 640px) and (min-height: 640px) and (max-aspect-ratio: 1/1) {
+		.screen {
+			--u: clamp(0.75px, min(100vw / 820, 100dvh / 1180), 1.5px);
+		}
+
+		.page {
+			grid-template-columns: repeat(5, 1fr);
+			grid-template-rows: repeat(6, 1fr);
+			padding-inline: calc(48 * var(--u));
 		}
 	}
 </style>

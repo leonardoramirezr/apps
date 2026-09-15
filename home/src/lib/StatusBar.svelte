@@ -1,17 +1,24 @@
 <script lang="ts">
-	// Decorative iPhone status bar, only visible when the home is drawn inside a device frame.
-	const format = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+	// Decorative iPad status bar, only visible on larger screens (phones show their own).
+	const timeFormat = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+	const dateFormat = new Intl.DateTimeFormat(undefined, {
+		weekday: 'short',
+		month: 'short',
+		day: 'numeric'
+	});
 
 	let now = $state(new Date());
 
 	const time = $derived(
-		format
+		timeFormat
 			.formatToParts(now)
 			.filter((part) => part.type !== 'dayPeriod')
 			.map((part) => part.value)
 			.join('')
 			.trim()
 	);
+
+	const date = $derived(dateFormat.format(now).replaceAll(',', ''));
 
 	$effect(() => {
 		const timer = setInterval(() => (now = new Date()), 10_000);
@@ -20,15 +27,11 @@
 </script>
 
 <div class="status-bar" aria-hidden="true">
-	<span class="time">{time}</span>
-	<span class="island"></span>
+	<span class="clock">
+		<span class="time">{time}</span>
+		<span>{date}</span>
+	</span>
 	<span class="indicators">
-		<svg viewBox="0 0 18 12" width="18" height="12">
-			<rect x="0" y="8" width="3" height="4" rx="1" />
-			<rect x="5" y="5.5" width="3" height="6.5" rx="1" />
-			<rect x="10" y="3" width="3" height="9" rx="1" />
-			<rect x="15" y="0" width="3" height="12" rx="1" />
-		</svg>
 		<svg viewBox="0 0 16 12" width="16" height="12">
 			<path
 				d="M8 2.4c2.2 0 4.2.8 5.7 2.2l1.2-1.3A10 10 0 0 0 8 .6 10 10 0 0 0 1.1 3.3l1.2 1.3A8.2 8.2 0 0 1 8 2.4Zm0 3.6c1.2 0 2.3.4 3.2 1.2l1.2-1.3A6.4 6.4 0 0 0 8 4.2c-1.7 0-3.2.6-4.4 1.7l1.2 1.3C5.7 6.4 6.8 6 8 6Zm0 3.6c-.5 0-1 .2-1.3.5L8 11.5l1.3-1.4c-.3-.3-.8-.5-1.3-.5Z"
@@ -47,38 +50,32 @@
 		display: none;
 	}
 
-	/* Keep in sync with the device-frame media query in +page.svelte. */
+	/* Keep in sync with the iPad media query in +page.svelte. */
 	@media (min-width: 640px) and (min-height: 640px) {
 		.status-bar {
-			position: relative;
-			display: grid;
-			grid-template-columns: 1fr calc(126 * var(--u)) 1fr;
+			display: flex;
 			align-items: center;
+			justify-content: space-between;
 			flex: none;
-			height: calc(54 * var(--u));
-			padding: 0 calc(22 * var(--u));
+			height: calc(32 * var(--u));
+			padding: 0 calc(24 * var(--u));
 			color: #fff;
+			font-size: calc(15 * var(--u));
+			font-weight: 600;
+			letter-spacing: -0.01em;
 		}
 	}
 
+	.clock {
+		display: flex;
+		gap: calc(6 * var(--u));
+	}
+
 	.time {
-		justify-self: center;
-		font-size: calc(17 * var(--u));
-		font-weight: 600;
-		letter-spacing: -0.01em;
 		font-variant-numeric: tabular-nums;
 	}
 
-	.island {
-		justify-self: center;
-		width: calc(124 * var(--u));
-		height: calc(36 * var(--u));
-		border-radius: calc(18 * var(--u));
-		background: #000;
-	}
-
 	.indicators {
-		justify-self: center;
 		display: flex;
 		align-items: center;
 		gap: calc(6 * var(--u));
