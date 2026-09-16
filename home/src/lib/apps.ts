@@ -1,5 +1,7 @@
 import { resolve } from '$app/paths';
 import reloadIcon from './reload.svg';
+import { ui } from './settings.svelte';
+import settingsIcon from './settings.svg';
 
 /**
  * Apps are discovered at build time. Every folder in `apps/<slug>/` must contain:
@@ -21,6 +23,13 @@ export type App = {
 
 /** Built into the home screen: they run an action instead of opening a published app. */
 const builtIns: App[] = [
+	{
+		slug: 'settings',
+		name: 'Ajustes',
+		icon: settingsIcon,
+		// The home screen's own settings, e.g. the wallpaper.
+		action: () => (ui.settingsOpen = true)
+	},
 	{
 		slug: 'reload',
 		name: 'Recargar',

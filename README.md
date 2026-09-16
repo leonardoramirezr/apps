@@ -63,6 +63,13 @@ Cada push a `main` compila y publica el sitio con GitHub Actions. La ruta base (
 
 Solo la primera vez: en el repositorio, **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
+## Inicio
+
+Además de las apps publicadas, la pantalla de inicio trae dos íconos propios:
+
+- **Recargar**: recarga el sitio, útil cuando corre a pantalla completa y sin controles del navegador.
+- **Ajustes**: cambia el fondo de pantalla. La foto elegida se reduce a 1600 px, se reencoda como JPEG y se guarda en el `localStorage` del navegador con la clave `home:wallpaper`. Sin foto se usa el degradado por omisión, que vuelve al tocar «Quitar».
+
 ## WillChat
 
 Chat al estilo ChatGPT para crear y editar imágenes con la API de OpenAI y tu propia API key.
