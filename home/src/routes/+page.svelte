@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { MediaQuery } from 'svelte/reactivity';
 	import { apps } from '$lib/apps';
+	import SettingsSheet from '$lib/SettingsSheet.svelte';
+	import { ui, wallpaper } from '$lib/settings.svelte';
 	import StatusBar from '$lib/StatusBar.svelte';
 
 	// Keep in sync with the iPad media query below and in StatusBar.svelte.
@@ -22,7 +24,11 @@
 	}
 </script>
 
-<div class="screen">
+<div
+	class="screen"
+	class:custom-wallpaper={wallpaper.value}
+	style:background-image={wallpaper.value ? `url(${wallpaper.value})` : undefined}
+>
 	<StatusBar />
 
 	<div class="pager" {onscroll}>
@@ -52,6 +58,8 @@
 	</div>
 </div>
 
+<SettingsSheet bind:open={ui.settingsOpen} />
+
 <style>
 	/* All sizes are expressed in device points (`--u`), scaled to fit the viewport. */
 	.screen {
@@ -69,6 +77,14 @@
 			radial-gradient(100% 60% at 0% 100%, rgb(40 120 255 / 0.9), transparent 70%),
 			radial-gradient(90% 55% at 100% 85%, rgb(130 70 240 / 0.95), transparent 70%),
 			linear-gradient(170deg, #4a2a8a, #1c1446);
+	}
+
+	/* The wallpaper picked in Ajustes, set inline as a background-image, replaces the gradients. */
+	.screen.custom-wallpaper {
+		background-position: center;
+		background-repeat: no-repeat;
+		background-size: cover;
+		background-color: #1c1446;
 	}
 
 	.pager {
