@@ -15,7 +15,6 @@ Colección de web apps estáticas que se publican juntas en GitHub Pages. La pá
 │       ├── app.json         # Manifiesto: { "name": "WillChat" }
 │       ├── icon.svg         # Ícono de la app
 │       └── …
-├── brand/logos/             # Propuestas de logo del sitio (fuera del build)
 ├── scripts/
 │   ├── build.mjs            # Construye el inicio y todas las apps en dist/
 │   └── preview.mjs          # Sirve dist/ igual que GitHub Pages
