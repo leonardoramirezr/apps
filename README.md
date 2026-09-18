@@ -4,6 +4,7 @@ Colección de web apps estáticas que se publican juntas en GitHub Pages. La pá
 
 - Inicio: https://leonardoramirezr.github.io/apps/
 - WillChat: https://leonardoramirezr.github.io/apps/willchat/
+- Me deben: https://leonardoramirezr.github.io/apps/me-deben/
 
 ## Estructura
 
@@ -79,3 +80,13 @@ Chat al estilo ChatGPT para crear y editar imágenes con la API de OpenAI y tu p
 - Las fotos se reducen a 2048 px y se envían como `input_image`. En cada turno se manda la conversación completa, incluidas las imágenes generadas antes, para que el modelo pueda seguir editándolas.
 - Las solicitudes usan `background: true` y se consultan cada 2 s. Generar una imagen puede tardar más de un minuto y Safari en iOS corta las solicitudes que pasan 60 s sin respuesta; así, además, la respuesta se recupera si recargas o cambias de app.
 - La conversación actual se guarda en IndexedDB.
+
+## Me deben
+
+Libreta de quién te debe dinero: al abrir se ve el total, la lista de personas que deben y, abajo, dos botones.
+
+- **+** («Presté») registra un préstamo nuevo. Primero se elige a quién: aparecen las personas ya registradas y, al escribir un nombre que no está, la opción de agregarlo. Después se captura el monto, la fecha, desde qué banco salió el dinero y a qué banco llegó.
+- **−** («Me pagaron») registra un pago. Solo lista a quienes deben algo y propone el adeudo completo como monto, que se puede editar para un abono parcial.
+- Al tocar una persona se ve su saldo, su historial de préstamos y pagos, y ahí mismo se le puede prestar de nuevo, registrar un pago, cambiar su nombre o eliminarla. «Editar» borra movimientos capturados por error.
+- La lista de bancos («Cuentas») trae las instituciones mexicanas agrupadas: bancos, fintech y no bancarias, banca de desarrollo, corporativos y extranjeros, y efectivo. Se guarda el nombre del banco, nunca un número de cuenta. El banco propio se recuerda para no elegirlo cada vez.
+- Todo vive en el `localStorage` del navegador con las claves `me-deben:*`; no hay servidor ni cuenta. Los montos se guardan en centavos enteros para que los saldos no acumulen errores de redondeo.
