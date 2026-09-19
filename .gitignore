@@ -5,6 +5,10 @@ node_modules
 build
 .svelte-kit
 
+# Generated from each icon.svg by scripts/icons.mjs
+/home/static/apple-touch-icon.png
+/apps/*/static/apple-touch-icon.png
+
 # OS
 .DS_Store
 Thumbs.db

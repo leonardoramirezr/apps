@@ -1,11 +1,11 @@
 <script lang="ts">
-	import favicon from '$lib/favicon.svg';
+	import icon from '$lib/icon.svg';
 
 	let { children } = $props();
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" href={icon} />
 </svelte:head>
 
 {@render children()}
