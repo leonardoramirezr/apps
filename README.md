@@ -77,7 +77,7 @@ Todo se publica en la rama `gh-pages`, que es la única que GitHub Pages sirve:
 
 `deploy.yml` corre en cada push: pasa `pnpm check`, compila con la ruta base que le toca y `scripts/publish-pages.sh` escribe el resultado en `gh-pages`. Publicar el sitio no borra las vistas previas, y cada rama solo toca su carpeta; si dos publican a la vez, el script vuelve a leer la rama y reintenta.
 
-Solo la primera vez: en el repositorio, **Settings → Pages → Build and deployment → Source: Deploy from a branch**, y elegir la rama `gh-pages` con la carpeta `/ (root)`. Mientras no se cambie, Pages sigue sirviendo el último deploy hecho con la opción anterior («GitHub Actions») y nada de esto se ve publicado.
+Solo la primera vez, y en este orden: primero un push a `main`, que es el que escribe el sitio en la raíz de `gh-pages`; después, en el repositorio, **Settings → Pages → Build and deployment → Source: Deploy from a branch**, y elegir la rama `gh-pages` con la carpeta `/ (root)`. Al revés, el sitio queda en 404 hasta el siguiente push a `main`. Mientras no se cambie el ajuste, Pages sigue sirviendo el último deploy hecho con la opción anterior («GitHub Actions») y nada de esto se ve publicado.
 
 ## Vistas previas
 
@@ -86,7 +86,7 @@ Cada rama que no es `main` se publica por su cuenta, para poder abrir un cambio 
 - El nombre de la carpeta sale del de la rama con la misma regla que las apps —minúsculas, dígitos y guiones—, así que `claude/wizardly-euler` se sirve en `/leo-os/previews/claude-wizardly-euler/`.
 - Si la rama tiene un PR abierto, el workflow deja ahí un comentario con el enlace y lo va actualizando. El enlace sale también en el resumen de cada ejecución, aunque todavía no haya PR.
 - `…/leo-os/previews/` lista las que hay, de la más reciente a la más vieja.
-- Al borrar la rama, `preview-cleanup.yml` quita su carpeta. Cuando no queda ninguna, `previews/` desaparece.
+- Al borrar la rama, `preview-cleanup.yml` quita su carpeta. Cuando no queda ninguna, `previews/` desaparece. GitHub corre ese workflow desde `main`, así que la limpieza empieza a funcionar cuando el archivo llega ahí.
 - GitHub Pages tarda alrededor de un minuto en servir lo que se acaba de publicar.
 
 Una vista previa vive en el mismo origen que el sitio publicado, así que comparte con él `localStorage` e IndexedDB: probar «Me deben» en una vista previa mueve los mismos datos que la app de verdad.
