@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ledger, type Movement, type Person } from '$lib/ledger.svelte';
-	import { formatDate, formatMoney } from '$lib/money';
+	import { formatDate, formatDateShort, formatMoney } from '$lib/money';
 	import MovementSheet from './MovementSheet.svelte';
 	import Sheet from './Sheet.svelte';
 
@@ -16,6 +16,7 @@
 	let collecting = $state(false);
 
 	const owed = $derived(ledger.owedBy(person.id));
+	const overdue = $derived(ledger.overdueBy(person.id));
 	const movements = $derived(ledger.movementsOf(person.id));
 
 	// Salir del modo edición al cerrar, para no reabrir la hoja con los botones rojos puestos.
@@ -59,8 +60,15 @@
 
 	<div class="balance">
 		{#if owed > 0}
-			<p class="caption">Te debe</p>
+			<p class="caption">Te debe en total</p>
 			<p class="amount total">{formatMoney(owed)}</p>
+			<p class="overdue" class:late={overdue > 0}>
+				{#if overdue > 0}
+					Ya venció <strong class="amount">{formatMoney(overdue)}</strong>
+				{:else}
+					Al corriente: nada vencido
+				{/if}
+			</p>
 		{:else if owed === 0}
 			<p class="caption">Sin adeudo</p>
 			<p class="amount total clear">{formatMoney(0)}</p>
@@ -111,6 +119,18 @@
 						<p class="meta">
 							{formatDate(movement.date)}{#if route(movement)}&nbsp;· {route(movement)}{/if}
 						</p>
+						{#if movement.kind === 'loan' && movement.dueDate}
+							<p class="due" class:late={ledger.isOverdue(movement)}>
+								{#if ledger.isOverdue(movement)}
+									Venció el {formatDateShort(movement.dueDate)} ·
+									<span class="amount">{formatMoney(ledger.pendingOn(movement))}</span> sin pagar
+								{:else if ledger.pendingOn(movement) === 0}
+									Pagado (vencía el {formatDateShort(movement.dueDate)})
+								{:else}
+									Se devuelve el {formatDateShort(movement.dueDate)}
+								{/if}
+							</p>
+						{/if}
 						{#if movement.note}
 							<p class="note">{movement.note}</p>
 						{/if}
@@ -180,6 +200,20 @@
 		color: var(--muted);
 	}
 
+	.overdue {
+		margin: 8px 0 0;
+		color: var(--muted);
+		font-size: 15px;
+	}
+
+	.overdue.late {
+		color: var(--danger);
+	}
+
+	.overdue strong {
+		font-weight: 600;
+	}
+
 	.actions {
 		display: flex;
 		gap: 12px;
@@ -245,10 +279,15 @@
 	}
 
 	.meta,
+	.due,
 	.note {
 		margin: 2px 0 0;
 		color: var(--muted);
 		font-size: 13px;
+	}
+
+	.due.late {
+		color: var(--danger);
 	}
 
 	.note {

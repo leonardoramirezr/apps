@@ -18,6 +18,7 @@
 	let selected = $state<Person | null>(null);
 	let amount = $state('');
 	let date = $state(today());
+	let dueDate = $state('');
 	let fromBank = $state('');
 	let toBank = $state('');
 	let note = $state('');
@@ -28,6 +29,10 @@
 	const cents = $derived(parseMoney(amount));
 	const owed = $derived(selected ? ledger.owedBy(selected.id) : 0);
 	const remaining = $derived(owed - (cents ?? 0));
+	// Un préstamo viejo se captura con las dos fechas en el pasado: ninguna se limita.
+	// Devolver antes de prestar sí es raro, pero solo se avisa; guardar nunca se bloquea por eso.
+	const badDueDate = $derived(loan && dueDate !== '' && dueDate < date);
+	const complete = $derived(cents !== null && date !== '');
 
 	// Cada vez que se abre la hoja se empieza de cero.
 	$effect(() => {
@@ -38,6 +43,7 @@
 		selected = person;
 		amount = person && !loan ? toAmountInput(ledger.owedBy(person.id)) : '';
 		date = today();
+		dueDate = '';
 		// Mi cuenta de siempre viene precargada; la de la otra persona cambia en cada préstamo.
 		fromBank = loan ? ledger.myBank : '';
 		toBank = loan ? '' : ledger.myBank;
@@ -51,13 +57,14 @@
 	}
 
 	function save() {
-		if (!selected || cents === null || !date) return;
+		if (!selected || !complete || cents === null) return;
 
 		ledger.addMovement({
 			personId: selected.id,
 			kind,
 			amount: cents,
 			date,
+			dueDate: loan ? dueDate : '',
 			fromBank,
 			toBank,
 			note: note.trim()
@@ -101,10 +108,26 @@
 				/>
 			</label>
 			<label class="row">
-				<span class="label">Fecha</span>
+				<span class="label">{loan ? 'Se prestó' : 'Fecha'}</span>
 				<input type="date" bind:value={date} max={today()} />
 			</label>
+			{#if loan}
+				<label class="row">
+					<span class="label">Se devuelve</span>
+					<input type="date" bind:value={dueDate} />
+				</label>
+			{/if}
 		</div>
+
+		{#if loan}
+			<p class="hint" class:warn={badDueDate}>
+				{#if badDueDate}
+					La devolución quedó antes del préstamo: revisa las fechas.
+				{:else if dueDate === ''}
+					Sin fecha de devolución el préstamo nunca se marca como vencido.
+				{/if}
+			</p>
+		{/if}
 
 		{#if !loan && owed > 0}
 			<p class="hint">
@@ -135,7 +158,7 @@
 		</div>
 
 		<div class="save">
-			<button class="primary" type="button" disabled={cents === null || !date} onclick={save}>
+			<button class="primary" type="button" disabled={!complete} onclick={save}>
 				{loan ? 'Guardar préstamo' : 'Guardar pago'}
 			</button>
 		</div>
@@ -163,8 +186,13 @@
 
 	.hint {
 		margin: 8px 4px 0;
+		min-height: 20px;
 		color: var(--muted);
 		font-size: 14px;
+	}
+
+	.hint.warn {
+		color: var(--danger);
 	}
 
 	.save {
