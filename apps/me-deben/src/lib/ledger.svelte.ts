@@ -1,4 +1,5 @@
 import { today } from './money';
+import { chargeCount, chargeDate, chargesDueBefore, isPlan, type Plan } from './plan';
 
 export interface Person {
 	id: string;
@@ -16,8 +17,14 @@ export interface Movement {
 	amount: number;
 	/** Cuándo se prestó (o se pagó), en "AAAA-MM-DD". */
 	date: string;
-	/** Solo en un préstamo: cuándo se debe devolver. Vacío si no se pactó fecha. */
+	/** Solo en un préstamo: cuándo se debe devolver. Vacío si no se pactó fecha o si hay acuerdo. */
 	dueDate: string;
+	/** Acuerdo de pago: cobro por semana o por mes. Vacío si se pactó una sola devolución. */
+	plan: Plan;
+	/** Centavos de cada cobro del acuerdo. 0 si no hay acuerdo. */
+	planAmount: number;
+	/** Primera fecha de cobro del acuerdo, en "AAAA-MM-DD". Vacío si no hay acuerdo. */
+	planStart: string;
 	/** En un préstamo, mi cuenta; en un pago, la suya. Vacío si no se especificó. */
 	fromBank: string;
 	/** En un préstamo, su cuenta; en un pago, la mía. */
@@ -100,16 +107,27 @@ function parseMovements(raw: unknown): Movement[] {
 		const date = isDate(item.date) ? text(item.date) : today();
 		// Lo guardado por versiones anteriores no traía fecha de devolución: se queda sin vencimiento.
 		const dueDate = isDate(item.dueDate) ? text(item.dueDate) : '';
+		const kind = item.kind === 'payment' ? ('payment' as const) : ('loan' as const);
+		// Un acuerdo sin monto o sin primera fecha de cobro no se puede calendarizar: se ignora.
+		const planAmount = typeof item.planAmount === 'number' ? Math.round(item.planAmount) : 0;
+		const plan: Plan =
+			kind === 'loan' && isPlan(item.plan) && planAmount > 0 && isDate(item.planStart)
+				? item.plan
+				: '';
 		if (!id || !personId || !(amount > 0)) return [];
 
 		return [
 			{
 				id,
 				personId,
-				kind: item.kind === 'payment' ? ('payment' as const) : ('loan' as const),
+				kind,
 				amount,
 				date,
-				dueDate: item.kind === 'payment' ? '' : dueDate,
+				// Con acuerdo de pago mandan los cobros: no hay una sola fecha de devolución.
+				dueDate: kind === 'payment' || plan !== '' ? '' : dueDate,
+				plan,
+				planAmount: plan === '' ? 0 : planAmount,
+				planStart: plan === '' ? '' : text(item.planStart),
 				fromBank: text(item.fromBank),
 				toBank: text(item.toBank),
 				note: text(item.note),
@@ -128,13 +146,18 @@ function byNewest(a: Movement, b: Movement): number {
 	return b.date.localeCompare(a.date) || b.createdAt - a.createdAt;
 }
 
+/** La fecha por la que corre un préstamo: la de devolución, o el primer cobro del acuerdo. */
+function dueAnchor(movement: Movement): string {
+	return movement.plan === '' ? movement.dueDate : movement.planStart;
+}
+
 /**
  * Lo que vence primero, primero; los préstamos sin fecha de devolución, al final.
  * Es el orden en que se aplican los pagos: quien paga salda antes lo más urgente.
  */
 function byDueDate(a: Movement, b: Movement): number {
-	const dueA = a.dueDate || '9999-12-31';
-	const dueB = b.dueDate || '9999-12-31';
+	const dueA = dueAnchor(a) || '9999-12-31';
+	const dueB = dueAnchor(b) || '9999-12-31';
 	return dueA.localeCompare(dueB) || a.date.localeCompare(b.date) || a.createdAt - b.createdAt;
 }
 
@@ -215,14 +238,14 @@ class Ledger {
 		return pending;
 	});
 
-	/** Lo pendiente de los préstamos cuya fecha de devolución ya pasó. */
+	/** Lo que ya venció de cada persona, sumando préstamo por préstamo. */
 	#overdues = $derived.by(() => {
 		const overdues = new Map<string, number>();
 		for (const [personId, { loans }] of this.#byPerson) {
-			const overdue = loans
-				.filter((loan) => this.isOverdue(loan))
-				.reduce((sum, loan) => sum + this.pendingOn(loan), 0);
-			overdues.set(personId, overdue);
+			overdues.set(
+				personId,
+				loans.reduce((sum, loan) => sum + this.overdueOn(loan), 0)
+			);
 		}
 		return overdues;
 	});
@@ -268,14 +291,43 @@ class Ledger {
 		return this.#pending.get(movement.id) ?? 0;
 	}
 
-	/** Un préstamo con fecha de devolución ya pasada y algo todavía sin pagar. */
+	/**
+	 * Centavos de un préstamo que ya debían estar pagados hoy: todo si pasó su fecha de
+	 * devolución, o lo que suman los cobros del acuerdo que ya quedaron atrás.
+	 */
+	#dueSoFar(movement: Movement): number {
+		if (movement.plan !== '') {
+			const charges = chargesDueBefore(movement.planStart, movement.plan, this.#today);
+			return Math.min(movement.amount, charges * movement.planAmount);
+		}
+		return movement.dueDate !== '' && movement.dueDate < this.#today ? movement.amount : 0;
+	}
+
+	/** Lo vencido de un préstamo: lo que ya debía estar pagado y sigue sin cubrirse. */
+	overdueOn(movement: Movement): number {
+		if (movement.kind !== 'loan') return 0;
+
+		const covered = movement.amount - this.pendingOn(movement);
+		return Math.max(0, this.#dueSoFar(movement) - covered);
+	}
+
+	/** Un préstamo con algo vencido: pasó su fecha de devolución, o le falta un cobro del acuerdo. */
 	isOverdue(movement: Movement): boolean {
-		return (
-			movement.kind === 'loan' &&
-			movement.dueDate !== '' &&
-			movement.dueDate < this.#today &&
-			this.pendingOn(movement) > 0
-		);
+		return this.overdueOn(movement) > 0;
+	}
+
+	/**
+	 * La fecha del siguiente cobro de un acuerdo que todavía está por venir. Vacía si el préstamo
+	 * ya se pagó o si todos sus cobros quedaron atrás, que es cuando solo queda lo vencido.
+	 */
+	nextChargeOn(movement: Movement): string {
+		if (movement.kind !== 'loan' || movement.plan === '' || this.pendingOn(movement) === 0) {
+			return '';
+		}
+
+		const next = chargesDueBefore(movement.planStart, movement.plan, this.#today);
+		const total = chargeCount(movement.amount, movement.planAmount);
+		return next < total ? chargeDate(movement.planStart, movement.plan, next) : '';
 	}
 
 	movementsOf(personId: string): Movement[] {
