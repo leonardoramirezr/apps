@@ -14,8 +14,10 @@ export interface Movement {
 	kind: MovementKind;
 	/** Centavos, siempre positivo. El signo lo da `kind`. */
 	amount: number;
-	/** "AAAA-MM-DD". */
+	/** Cuándo se prestó (o se pagó), en "AAAA-MM-DD". */
 	date: string;
+	/** Solo en un préstamo: cuándo se debe devolver. Vacío si no se pactó fecha. */
+	dueDate: string;
 	/** En un préstamo, mi cuenta; en un pago, la suya. Vacío si no se especificó. */
 	fromBank: string;
 	/** En un préstamo, su cuenta; en un pago, la mía. */
@@ -30,8 +32,8 @@ export interface Balance {
 	person: Person;
 	/** Centavos que me debe. 0 si está al corriente. */
 	owed: number;
-	/** Fecha del último movimiento, o `null` si no tiene ninguno. */
-	lastDate: string | null;
+	/** Centavos que me debe y ya pasaron de su fecha de devolución. */
+	overdue: number;
 }
 
 // Todas las apps del sitio comparten el origen: las claves van con prefijo.
@@ -73,6 +75,10 @@ function text(value: unknown): string {
 	return typeof value === 'string' ? value : '';
 }
 
+function isDate(value: unknown): boolean {
+	return /^\d{4}-\d{2}-\d{2}$/.test(text(value));
+}
+
 /** Lo guardado pudo escribirlo una versión anterior: se descarta lo que no cuadre. */
 function parsePeople(raw: unknown): Person[] {
 	if (!Array.isArray(raw)) return [];
@@ -91,7 +97,9 @@ function parseMovements(raw: unknown): Movement[] {
 		const id = text(item.id);
 		const personId = text(item.personId);
 		const amount = typeof item.amount === 'number' ? Math.round(item.amount) : 0;
-		const date = /^\d{4}-\d{2}-\d{2}$/.test(text(item.date)) ? text(item.date) : today();
+		const date = isDate(item.date) ? text(item.date) : today();
+		// Lo guardado por versiones anteriores no traía fecha de devolución: se queda sin vencimiento.
+		const dueDate = isDate(item.dueDate) ? text(item.dueDate) : '';
 		if (!id || !personId || !(amount > 0)) return [];
 
 		return [
@@ -101,6 +109,7 @@ function parseMovements(raw: unknown): Movement[] {
 				kind: item.kind === 'payment' ? ('payment' as const) : ('loan' as const),
 				amount,
 				date,
+				dueDate: item.kind === 'payment' ? '' : dueDate,
 				fromBank: text(item.fromBank),
 				toBank: text(item.toBank),
 				note: text(item.note),
@@ -119,6 +128,16 @@ function byNewest(a: Movement, b: Movement): number {
 	return b.date.localeCompare(a.date) || b.createdAt - a.createdAt;
 }
 
+/**
+ * Lo que vence primero, primero; los préstamos sin fecha de devolución, al final.
+ * Es el orden en que se aplican los pagos: quien paga salda antes lo más urgente.
+ */
+function byDueDate(a: Movement, b: Movement): number {
+	const dueA = a.dueDate || '9999-12-31';
+	const dueB = b.dueDate || '9999-12-31';
+	return dueA.localeCompare(dueB) || a.date.localeCompare(b.date) || a.createdAt - b.createdAt;
+}
+
 class Ledger {
 	people = $state<Person[]>([]);
 	movements = $state<Movement[]>([]);
@@ -126,10 +145,18 @@ class Ledger {
 	/** La cuenta desde la que suelo prestar, para no elegirla cada vez. */
 	#myBank = $state('');
 
+	/** El día de hoy, contra el que se compara cada fecha de devolución. */
+	#today = $state(today());
+
 	constructor() {
 		this.people = read(PEOPLE_KEY, parsePeople);
 		this.movements = read(MOVEMENTS_KEY, parseMovements);
 		this.#myBank = readString(MY_BANK_KEY);
+	}
+
+	/** La app puede quedar abierta de un día para otro: al volver se recalcula lo vencido. */
+	refreshToday() {
+		this.#today = today();
 	}
 
 	get myBank(): string {
@@ -155,24 +182,65 @@ class Ledger {
 		return totals;
 	});
 
-	#lastDates = $derived.by(() => {
-		const dates = new Map<string, string>();
+	/** Préstamos de cada persona (los que vencen antes, primero) con lo que ya pagó en total. */
+	#byPerson = $derived.by(() => {
+		const entries = new Map<string, { loans: Movement[]; paid: number }>();
 		for (const movement of this.movements) {
-			const current = dates.get(movement.personId);
-			if (!current || movement.date > current) dates.set(movement.personId, movement.date);
+			let entry = entries.get(movement.personId);
+			if (!entry) {
+				entry = { loans: [], paid: 0 };
+				entries.set(movement.personId, entry);
+			}
+			if (movement.kind === 'loan') entry.loans.push(movement);
+			else entry.paid += movement.amount;
 		}
-		return dates;
+		for (const entry of entries.values()) entry.loans.sort(byDueDate);
+		return entries;
 	});
 
-	/** Todas las personas con su saldo, las que más deben primero. */
+	/**
+	 * Centavos que falta cubrir de cada préstamo. Los pagos no se capturan contra un préstamo
+	 * en concreto, así que se reparten sobre los que vencen primero.
+	 */
+	#pending = $derived.by(() => {
+		const pending = new Map<string, number>();
+		for (const { loans, paid } of this.#byPerson.values()) {
+			let credit = paid;
+			for (const loan of loans) {
+				const applied = Math.min(credit, loan.amount);
+				credit -= applied;
+				pending.set(loan.id, loan.amount - applied);
+			}
+		}
+		return pending;
+	});
+
+	/** Lo pendiente de los préstamos cuya fecha de devolución ya pasó. */
+	#overdues = $derived.by(() => {
+		const overdues = new Map<string, number>();
+		for (const [personId, { loans }] of this.#byPerson) {
+			const overdue = loans
+				.filter((loan) => this.isOverdue(loan))
+				.reduce((sum, loan) => sum + this.pendingOn(loan), 0);
+			overdues.set(personId, overdue);
+		}
+		return overdues;
+	});
+
+	/** Todas las personas con su saldo: primero quien tiene vencido, luego quien más debe. */
 	balances = $derived.by((): Balance[] =>
 		this.people
 			.map((person) => ({
 				person,
 				owed: this.#balances.get(person.id) ?? 0,
-				lastDate: this.#lastDates.get(person.id) ?? null
+				overdue: this.#overdues.get(person.id) ?? 0
 			}))
-			.sort((a, b) => b.owed - a.owed || a.person.name.localeCompare(b.person.name, 'es'))
+			.sort(
+				(a, b) =>
+					b.overdue - a.overdue ||
+					b.owed - a.owed ||
+					a.person.name.localeCompare(b.person.name, 'es')
+			)
 	);
 
 	/** Quienes me deben algo ahora mismo. */
@@ -184,8 +252,30 @@ class Ledger {
 	/** Suma de lo que me deben. Un saldo a favor de alguien no resta al total. */
 	total = $derived(this.debtors.reduce((sum, entry) => sum + entry.owed, 0));
 
+	/** Suma de lo vencido de todas las personas. */
+	totalOverdue = $derived(this.debtors.reduce((sum, entry) => sum + entry.overdue, 0));
+
 	owedBy(personId: string): number {
 		return this.#balances.get(personId) ?? 0;
+	}
+
+	overdueBy(personId: string): number {
+		return this.#overdues.get(personId) ?? 0;
+	}
+
+	/** Centavos que faltan por cubrir de un préstamo. Un pago no tiene pendiente: es 0. */
+	pendingOn(movement: Movement): number {
+		return this.#pending.get(movement.id) ?? 0;
+	}
+
+	/** Un préstamo con fecha de devolución ya pasada y algo todavía sin pagar. */
+	isOverdue(movement: Movement): boolean {
+		return (
+			movement.kind === 'loan' &&
+			movement.dueDate !== '' &&
+			movement.dueDate < this.#today &&
+			this.pendingOn(movement) > 0
+		);
 	}
 
 	movementsOf(personId: string): Movement[] {

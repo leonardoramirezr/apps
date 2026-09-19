@@ -2,7 +2,7 @@
 	import MovementSheet from '$lib/components/MovementSheet.svelte';
 	import PersonSheet from '$lib/components/PersonSheet.svelte';
 	import { ledger, type Person } from '$lib/ledger.svelte';
-	import { formatDateShort, formatMoney } from '$lib/money';
+	import { formatMoney } from '$lib/money';
 
 	let lending = $state(false);
 	let collecting = $state(false);
@@ -17,7 +17,7 @@
 
 <div class="screen">
 	<header>
-		<h1>Me deben</h1>
+		<h1>Me deben en total</h1>
 		<p class="amount total">{formatMoney(ledger.total)}</p>
 		<p class="caption">
 			{#if ledger.debtors.length === 0}
@@ -28,6 +28,17 @@
 				{ledger.debtors.length} personas te deben
 			{/if}
 		</p>
+
+		{#if ledger.debtors.length > 0}
+			<p class="overdue-total" class:late={ledger.totalOverdue > 0}>
+				{#if ledger.totalOverdue > 0}
+					<span class="dot" aria-hidden="true"></span>
+					Ya venció <strong class="amount">{formatMoney(ledger.totalOverdue)}</strong>
+				{:else}
+					Nada vencido: todos al corriente
+				{/if}
+			</p>
+		{/if}
 	</header>
 
 	<main>
@@ -37,8 +48,12 @@
 					<button class="row person" type="button" onclick={() => openPerson(entry.person)}>
 						<span class="detail">
 							<span class="name">{entry.person.name}</span>
-							{#if entry.lastDate}
-								<span class="meta">Último movimiento: {formatDateShort(entry.lastDate)}</span>
+							{#if entry.overdue > 0}
+								<span class="meta late">
+									Vencido: <span class="amount">{formatMoney(entry.overdue)}</span>
+								</span>
+							{:else}
+								<span class="meta">Al corriente</span>
 							{/if}
 						</span>
 						<span class="amount owed">{formatMoney(entry.owed)}</span>
@@ -131,6 +146,30 @@
 		font-size: 15px;
 	}
 
+	.overdue-total {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: 12px 0 0;
+		color: var(--muted);
+		font-size: 15px;
+	}
+
+	.overdue-total.late {
+		color: var(--danger);
+	}
+
+	.overdue-total strong {
+		font-weight: 600;
+	}
+
+	.dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--danger);
+	}
+
 	.person {
 		width: 100%;
 		gap: 10px;
@@ -157,6 +196,10 @@
 	.meta {
 		color: var(--muted);
 		font-size: 13px;
+	}
+
+	.meta.late {
+		color: var(--danger);
 	}
 
 	.owed {

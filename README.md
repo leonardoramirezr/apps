@@ -92,10 +92,12 @@ Chat al estilo ChatGPT para crear y editar imágenes con la API de OpenAI y tu p
 
 ## Me deben
 
-Libreta de quién te debe dinero: al abrir se ve el total, la lista de personas que deben y, abajo, dos botones.
+Libreta de quién te debe dinero: al abrir se ve cuánto te deben en total, cuánto de eso ya venció, la lista de personas que deben y, abajo, dos botones.
 
-- **+** («Presté») registra un préstamo nuevo. Primero se elige a quién: aparecen las personas ya registradas y, al escribir un nombre que no está, la opción de agregarlo. Después se captura el monto, la fecha, desde qué banco salió el dinero y a qué banco llegó.
+- **+** («Presté») registra un préstamo nuevo. Primero se elige a quién: aparecen las personas ya registradas y, al escribir un nombre que no está, la opción de agregarlo. Después se captura el monto, cuándo se prestó, cuándo se debe devolver, desde qué banco salió el dinero y a qué banco llegó. La fecha de devolución es opcional: sin ella el préstamo nunca se marca como vencido.
 - **−** («Me pagaron») registra un pago. Solo lista a quienes deben algo y propone el adeudo completo como monto, que se puede editar para un abono parcial.
-- Al tocar una persona se ve su saldo, su historial de préstamos y pagos, y ahí mismo se le puede prestar de nuevo, registrar un pago, cambiar su nombre o eliminarla. «Editar» borra movimientos capturados por error.
+- Vencido es lo que pasó de su fecha de devolución y sigue sin pagarse. Cada fila de la lista muestra cuánto debe esa persona de vencido, o **Al corriente** si no le ha vencido nada; quien tiene vencido aparece primero.
+- Los pagos no se capturan contra un préstamo en concreto, así que se reparten sobre los préstamos que vencen primero: quien abona salda antes lo más atrasado.
+- Al tocar una persona se ve cuánto debe en total y cuánto ya venció, su historial de préstamos y pagos —cada préstamo con su fecha de devolución y lo que le falta por cubrir—, y ahí mismo se le puede prestar de nuevo, registrar un pago, cambiar su nombre o eliminarla. «Editar» borra movimientos capturados por error.
 - La lista de bancos («Cuentas») trae las instituciones mexicanas agrupadas: bancos, fintech y no bancarias, banca de desarrollo, corporativos y extranjeros, y efectivo. Se guarda el nombre del banco, nunca un número de cuenta. El banco propio se recuerda para no elegirlo cada vez.
 - Todo vive en el `localStorage` del navegador con las claves `me-deben:*`; no hay servidor ni cuenta. Los montos se guardan en centavos enteros para que los saldos no acumulen errores de redondeo.
