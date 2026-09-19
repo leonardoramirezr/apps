@@ -29,9 +29,10 @@
 	const cents = $derived(parseMoney(amount));
 	const owed = $derived(selected ? ledger.owedBy(selected.id) : 0);
 	const remaining = $derived(owed - (cents ?? 0));
-	// Devolver antes de prestar no existe: se pide corregir la fecha en vez de guardarla al revés.
+	// Un préstamo viejo se captura con las dos fechas en el pasado: ninguna se limita.
+	// Devolver antes de prestar sí es raro, pero solo se avisa; guardar nunca se bloquea por eso.
 	const badDueDate = $derived(loan && dueDate !== '' && dueDate < date);
-	const complete = $derived(cents !== null && date !== '' && !badDueDate);
+	const complete = $derived(cents !== null && date !== '');
 
 	// Cada vez que se abre la hoja se empieza de cero.
 	$effect(() => {
@@ -113,7 +114,7 @@
 			{#if loan}
 				<label class="row">
 					<span class="label">Se devuelve</span>
-					<input type="date" bind:value={dueDate} min={date} />
+					<input type="date" bind:value={dueDate} />
 				</label>
 			{/if}
 		</div>
@@ -121,7 +122,7 @@
 		{#if loan}
 			<p class="hint" class:warn={badDueDate}>
 				{#if badDueDate}
-					La fecha de devolución no puede ser anterior a la del préstamo.
+					La devolución quedó antes del préstamo: revisa las fechas.
 				{:else if dueDate === ''}
 					Sin fecha de devolución el préstamo nunca se marca como vencido.
 				{/if}
