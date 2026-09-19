@@ -19,8 +19,13 @@ Colección de web apps estáticas que se publican juntas en GitHub Pages. La pá
 ├── scripts/
 │   ├── build.mjs            # Construye el inicio y todas las apps en dist/
 │   ├── icons.mjs            # Convierte cada icon.svg en el PNG que pide iOS
-│   └── preview.mjs          # Sirve dist/ igual que GitHub Pages
-└── .github/workflows/deploy.yml
+│   ├── preview.mjs          # Sirve dist/ igual que GitHub Pages
+│   ├── preview-slug.sh      # El nombre que le toca a una rama dentro de previews/
+│   ├── previews-index.mjs   # Arma la lista de vistas previas publicadas
+│   └── publish-pages.sh     # Escribe el sitio (o una vista previa) en gh-pages
+└── .github/workflows/
+    ├── deploy.yml           # Publica en cada push
+    └── preview-cleanup.yml  # Quita la vista previa al borrar la rama
 ```
 
 ## Contrato de una app
@@ -63,9 +68,28 @@ BASE_PATH=/apps pnpm preview   # http://localhost:4173/apps/
 
 ## Deploy
 
-Cada push a `main` compila y publica el sitio con GitHub Actions. La ruta base (`/apps`) la da GitHub Pages automáticamente.
+Todo se publica en la rama `gh-pages`, que es la única que GitHub Pages sirve:
 
-Solo la primera vez: en el repositorio, **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+| Lo que se empuja    | Dónde queda           | URL                                  |
+| ------------------- | --------------------- | ------------------------------------ |
+| `main`              | la raíz de `gh-pages` | `…github.io/leo-os/`                 |
+| cualquier otra rama | `previews/<rama>/`    | `…github.io/leo-os/previews/<rama>/` | `…github.io/leo-os/previews/<rama>/`   |
+
+`deploy.yml` corre en cada push: pasa `pnpm check`, compila con la ruta base que le toca y `scripts/publish-pages.sh` escribe el resultado en `gh-pages`. Publicar el sitio no borra las vistas previas, y cada rama solo toca su carpeta; si dos publican a la vez, el script vuelve a leer la rama y reintenta.
+
+Solo la primera vez: en el repositorio, **Settings → Pages → Build and deployment → Source: Deploy from a branch**, y elegir la rama `gh-pages` con la carpeta `/ (root)`. Mientras no se cambie, Pages sigue sirviendo el último deploy hecho con la opción anterior («GitHub Actions») y nada de esto se ve publicado.
+
+## Vistas previas
+
+Cada rama que no es `main` se publica por su cuenta, para poder abrir un cambio y probarlo antes de mezclarlo.
+
+- El nombre de la carpeta sale del de la rama con la misma regla que las apps —minúsculas, dígitos y guiones—, así que `claude/wizardly-euler` se sirve en `/leo-os/previews/claude-wizardly-euler/`.
+- Si la rama tiene un PR abierto, el workflow deja ahí un comentario con el enlace y lo va actualizando. El enlace sale también en el resumen de cada ejecución, aunque todavía no haya PR.
+- `…/leo-os/previews/` lista las que hay, de la más reciente a la más vieja.
+- Al borrar la rama, `preview-cleanup.yml` quita su carpeta. Cuando no queda ninguna, `previews/` desaparece.
+- GitHub Pages tarda alrededor de un minuto en servir lo que se acaba de publicar.
+
+Una vista previa vive en el mismo origen que el sitio publicado, así que comparte con él `localStorage` e IndexedDB: probar «Me deben» en una vista previa mueve los mismos datos que la app de verdad.
 
 ## Ícono en la pantalla de inicio
 
