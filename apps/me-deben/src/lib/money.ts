@@ -32,7 +32,7 @@ const longDate = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long
 const shortDate = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' });
 
 /** Las fechas se guardan como "AAAA-MM-DD" y se leen como fecha local, no UTC. */
-function toDate(iso: string): Date {
+export function toDate(iso: string): Date {
 	const [year, month, day] = iso.split('-').map(Number);
 	return new Date(year, month - 1, day);
 }
@@ -48,10 +48,14 @@ export function formatDateShort(iso: string): string {
 	return shortDate.format(date).replace('.', '');
 }
 
+/** Una fecha local de vuelta a "AAAA-MM-DD". */
+export function toIso(date: Date): string {
+	const month = `${date.getMonth() + 1}`.padStart(2, '0');
+	const day = `${date.getDate()}`.padStart(2, '0');
+	return `${date.getFullYear()}-${month}-${day}`;
+}
+
 /** Hoy en "AAAA-MM-DD", en la zona horaria del navegador. */
 export function today(): string {
-	const now = new Date();
-	const month = `${now.getMonth() + 1}`.padStart(2, '0');
-	const day = `${now.getDate()}`.padStart(2, '0');
-	return `${now.getFullYear()}-${month}-${day}`;
+	return toIso(new Date());
 }

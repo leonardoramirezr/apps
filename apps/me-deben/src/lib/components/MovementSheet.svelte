@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { ledger, type MovementKind, type Person } from '$lib/ledger.svelte';
-	import { formatMoney, parseMoney, toAmountInput, today } from '$lib/money';
+	import { formatDateShort, formatMoney, parseMoney, toAmountInput, today } from '$lib/money';
+	import { chargeCount, chargeDate, perLabel, plans, type Plan } from '$lib/plan';
 	import BankSelect from './BankSelect.svelte';
 	import PersonPicker from './PersonPicker.svelte';
 	import Sheet from './Sheet.svelte';
@@ -19,6 +20,9 @@
 	let amount = $state('');
 	let date = $state(today());
 	let dueDate = $state('');
+	let plan = $state<Plan>('');
+	let planAmount = $state('');
+	let planStart = $state('');
 	let fromBank = $state('');
 	let toBank = $state('');
 	let note = $state('');
@@ -31,8 +35,28 @@
 	const remaining = $derived(owed - (cents ?? 0));
 	// Un préstamo viejo se captura con las dos fechas en el pasado: ninguna se limita.
 	// Devolver antes de prestar sí es raro, pero solo se avisa; guardar nunca se bloquea por eso.
-	const badDueDate = $derived(loan && dueDate !== '' && dueDate < date);
-	const complete = $derived(cents !== null && date !== '');
+	const badDueDate = $derived(loan && plan === '' && dueDate !== '' && dueDate < date);
+
+	const planCents = $derived(parseMoney(planAmount));
+
+	/** Los cobros que saldrían del acuerdo, para explicarlo antes de guardar. */
+	const schedule = $derived.by(() => {
+		if (!loan || plan === '' || cents === null || planCents === null || planStart === '') {
+			return null;
+		}
+
+		const count = chargeCount(cents, planCents);
+		return {
+			count,
+			each: planCents,
+			// El último cobro es lo que sobra del préstamo, así que puede ser menor.
+			last: cents - (count - 1) * planCents,
+			end: chargeDate(planStart, plan, count - 1)
+		};
+	});
+
+	// Un acuerdo a medio capturar no se puede guardar: le falta el monto o el primer cobro.
+	const complete = $derived(cents !== null && date !== '' && (plan === '' || schedule !== null));
 
 	// Cada vez que se abre la hoja se empieza de cero.
 	$effect(() => {
@@ -44,6 +68,9 @@
 		amount = person && !loan ? toAmountInput(ledger.owedBy(person.id)) : '';
 		date = today();
 		dueDate = '';
+		plan = '';
+		planAmount = '';
+		planStart = '';
 		// Mi cuenta de siempre viene precargada; la de la otra persona cambia en cada préstamo.
 		fromBank = loan ? ledger.myBank : '';
 		toBank = loan ? '' : ledger.myBank;
@@ -64,7 +91,11 @@
 			kind,
 			amount: cents,
 			date,
-			dueDate: loan ? dueDate : '',
+			// El acuerdo de pago sustituye a la fecha de devolución: nunca se guardan los dos.
+			dueDate: loan && plan === '' ? dueDate : '',
+			plan: loan ? plan : '',
+			planAmount: loan && plan !== '' ? (planCents ?? 0) : 0,
+			planStart: loan && plan !== '' ? planStart : '',
 			fromBank,
 			toBank,
 			note: note.trim()
@@ -113,15 +144,56 @@
 			</label>
 			{#if loan}
 				<label class="row">
-					<span class="label">Se devuelve</span>
-					<input type="date" bind:value={dueDate} />
+					<span class="label">Acuerdo de pago</span>
+					<select bind:value={plan}>
+						<option value="">Sin acuerdo</option>
+						{#each plans as option (option.value)}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
 				</label>
+				<!-- Con acuerdo de pago no hay una sola devolución, sino cobros: el campo sobra. -->
+				{#if plan === ''}
+					<label class="row">
+						<span class="label">Se devuelve</span>
+						<input type="date" bind:value={dueDate} />
+					</label>
+				{:else}
+					<label class="row">
+						<span class="label">Monto {perLabel(plan)}</span>
+						<input
+							type="text"
+							inputmode="decimal"
+							bind:value={planAmount}
+							placeholder="0.00"
+							autocomplete="off"
+							enterkeyhint="done"
+						/>
+					</label>
+					<label class="row">
+						<span class="label">Primer cobro</span>
+						<input type="date" bind:value={planStart} />
+					</label>
+				{/if}
 			{/if}
 		</div>
 
 		{#if loan}
 			<p class="hint" class:warn={badDueDate}>
-				{#if badDueDate}
+				{#if plan !== ''}
+					{#if schedule === null}
+						Se cobra {perLabel(plan)} a partir del primer cobro.
+					{:else if schedule.count === 1}
+						Un solo cobro de {formatMoney(schedule.last)} el {formatDateShort(planStart)}.
+					{:else if schedule.last === schedule.each}
+						{schedule.count} cobros de {formatMoney(schedule.each)}, del {formatDateShort(planStart)}
+						al {formatDateShort(schedule.end)}.
+					{:else}
+						{schedule.count} cobros, del {formatDateShort(planStart)} al {formatDateShort(
+							schedule.end
+						)}: el último es de {formatMoney(schedule.last)}.
+					{/if}
+				{:else if badDueDate}
 					La devolución quedó antes del préstamo: revisa las fechas.
 				{:else if dueDate === ''}
 					Sin fecha de devolución el préstamo nunca se marca como vencido.
@@ -193,6 +265,15 @@
 
 	.hint.warn {
 		color: var(--danger);
+	}
+
+	select {
+		color: var(--link);
+	}
+
+	/* El menú desplegable se lee mejor alineado a la izquierda que el valor de la fila. */
+	option {
+		text-align: left;
 	}
 
 	.save {

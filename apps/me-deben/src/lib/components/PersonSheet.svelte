@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ledger, type Movement, type Person } from '$lib/ledger.svelte';
 	import { formatDate, formatDateShort, formatMoney } from '$lib/money';
+	import { perLabel } from '$lib/plan';
 	import MovementSheet from './MovementSheet.svelte';
 	import Sheet from './Sheet.svelte';
 
@@ -119,7 +120,20 @@
 						<p class="meta">
 							{formatDate(movement.date)}{#if route(movement)}&nbsp;· {route(movement)}{/if}
 						</p>
-						{#if movement.kind === 'loan' && movement.dueDate}
+						{#if movement.plan !== ''}
+							{@const next = ledger.nextChargeOn(movement)}
+							<p class="due" class:late={ledger.isOverdue(movement)}>
+								{formatMoney(movement.planAmount)}
+								{perLabel(movement.plan)}
+								{#if ledger.isOverdue(movement)}
+									· ya venció <span class="amount">{formatMoney(ledger.overdueOn(movement))}</span>
+								{:else if ledger.pendingOn(movement) === 0}
+									· pagado
+								{:else if next !== ''}
+									· próximo cobro el {formatDateShort(next)}
+								{/if}
+							</p>
+						{:else if movement.kind === 'loan' && movement.dueDate}
 							<p class="due" class:late={ledger.isOverdue(movement)}>
 								{#if ledger.isOverdue(movement)}
 									Venció el {formatDateShort(movement.dueDate)} ·
