@@ -9,7 +9,7 @@
 			<stop offset="1" stop-color="#e94fa1" />
 		</linearGradient>
 	</defs>
-	<rect width="1024" height="1024" fill="url(#icon-bg)" />
+	<rect width="1024" height="1024" rx="230" fill="url(#icon-bg)" />
 	<!-- 3 × 3 tiles, fading towards the bottom right so the grid reads with some depth. -->
 	<g fill="#fff">
 		<rect x="224" y="224" width="160" height="160" rx="44" />
