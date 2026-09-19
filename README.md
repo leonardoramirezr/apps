@@ -1,10 +1,10 @@
-# apps
+# Leo OS
 
 Colección de web apps estáticas que se publican juntas en GitHub Pages. La página de inicio imita la pantalla de inicio de un iPhone: cada app es un ícono.
 
-- Inicio: https://leonardoramirezr.github.io/apps/
-- WillChat: https://leonardoramirezr.github.io/apps/willchat/
-- Me deben: https://leonardoramirezr.github.io/apps/me-deben/
+- Inicio: https://leonardoramirezr.github.io/leo-os/
+- WillChat: https://leonardoramirezr.github.io/leo-os/willchat/
+- Me deben: https://leonardoramirezr.github.io/leo-os/me-deben/
 
 ## Estructura
 
