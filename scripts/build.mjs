@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeIcons } from './icons.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = join(root, 'dist');
@@ -64,6 +65,9 @@ function build(dir, basePath) {
 }
 
 const apps = findApps();
+
+// Each project picks its own static/apple-touch-icon.png up during its build.
+writeIcons();
 
 rmSync(dist, { recursive: true, force: true });
 cpSync(build(join(root, 'home'), base), dist, { recursive: true });

@@ -18,6 +18,7 @@ Colección de web apps estáticas que se publican juntas en GitHub Pages. La pá
 │       └── …
 ├── scripts/
 │   ├── build.mjs            # Construye el inicio y todas las apps en dist/
+│   ├── icons.mjs            # Convierte cada icon.svg en el PNG que pide iOS
 │   └── preview.mjs          # Sirve dist/ igual que GitHub Pages
 └── .github/workflows/deploy.yml
 ```
@@ -29,12 +30,13 @@ Cada carpeta dentro de `apps/` es una app y se publica en `<BASE_PATH>/<carpeta>
 | Archivo        | Qué debe contener                                                                                        |
 | -------------- | -------------------------------------------------------------------------------------------------------- |
 | `app.json`     | `{ "name": "Nombre visible" }`                                                                           |
-| `icon.svg`     | Ícono cuadrado, a sangre completa y sin esquinas redondeadas: el inicio aplica la máscara.               |
+| `icon.svg`     | Ícono cuadrado, a sangre completa y sin esquinas redondeadas: el inicio e iOS aplican la máscara.        |
 | `package.json` | Un script `build` que genere `build/index.html` usando la variable de entorno `BASE_PATH` como ruta base. |
 
 Además:
 
 - El nombre de la carpeta es parte de la URL: solo minúsculas, dígitos y guiones.
+- El ícono de la pantalla de inicio del iPhone sale del mismo `icon.svg`: no hay que dibujarlo aparte.
 - Todo se renderiza en el cliente; ninguna app necesita backend propio.
 - Todas las apps comparten el origen `leonardoramirezr.github.io`, y por lo tanto `localStorage` e IndexedDB. Usa un prefijo propio en las claves (p. ej. `willchat:`).
 
@@ -49,6 +51,7 @@ pnpm install
 pnpm --filter willchat dev     # una app
 pnpm --filter home dev         # el inicio
 pnpm check                     # svelte-check en todos los proyectos
+pnpm icons                     # regenera los apple-touch-icon.png tras editar un icon.svg
 ```
 
 Para probar el sitio completo como queda publicado:
@@ -63,6 +66,12 @@ BASE_PATH=/apps pnpm preview   # http://localhost:4173/apps/
 Cada push a `main` compila y publica el sitio con GitHub Actions. La ruta base (`/apps`) la da GitHub Pages automáticamente.
 
 Solo la primera vez: en el repositorio, **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+## Ícono en la pantalla de inicio
+
+Safari no acepta un SVG para el ícono que se guarda con «Agregar a pantalla de inicio»: si no encuentra un PNG, guarda una captura de la página. Por eso `scripts/icons.mjs` convierte cada `icon.svg` en un `apple-touch-icon.png` de 180 × 180 dentro de `static/` del proyecto, y cada `app.html` lo enlaza con `<link rel="apple-touch-icon">`. El PNG se genera al compilar y al instalar; no se versiona, así que el SVG sigue siendo la única fuente.
+
+El ícono debe ser opaco y llegar a los bordes: iOS le aplica su propia máscara redondeada y pinta de negro lo que esté transparente. Safari también cachea el ícono con ganas; si al probar sigue apareciendo el anterior, cierra la pestaña y vuelve a abrir la página.
 
 ## Inicio
 
